@@ -6,6 +6,7 @@
 
 import { ALARM, COLOURS, GUARD, CAMERA, VIEW } from './config.js';
 import { conePolygon } from './vision.js';
+import { drawParticles } from './fx.js';
 import { ROOMS, VAULT, VAN, totalLootValue } from './world.js';
 
 function fillRect(ctx, x, y, w, h, colour) {
@@ -256,11 +257,28 @@ function drawGuard(ctx, state, guard) {
   const coneColour = guard.seesThief ? COLOURS.coneHot : state.alarm > 55 ? COLOURS.coneAlert : COLOURS.coneCalm;
   polygon(ctx, conePolygon(guard.x, guard.y, guard.facing, GUARD.visionRange, GUARD.visionHalfAngle, state.segments), coneColour);
   circle(ctx, guard.x, guard.y, GUARD.radius + 3, 'rgba(0,0,0,0.25)');
+  // Flashlight tint: a warm pool of light spilling from the guard's torch,
+  // so the cone reads as torchlight rather than an abstract sector.
+  const lx = guard.x + Math.cos(guard.facing) * 17;
+  const ly = guard.y + Math.sin(guard.facing) * 17;
+  const glow = ctx.createRadialGradient(lx, ly, 2, lx, ly, 36);
+  glow.addColorStop(0, 'rgba(255, 241, 190, 0.22)');
+  glow.addColorStop(1, 'rgba(255, 241, 190, 0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath(); ctx.arc(lx, ly, 36, 0, Math.PI * 2); ctx.fill();
   circle(ctx, guard.x, guard.y, GUARD.radius, '#31559e');
   ctx.fillStyle = '#22355e';
   ctx.beginPath();
   ctx.arc(guard.x, guard.y, GUARD.radius, guard.facing - 1.15, guard.facing + 1.15);
   ctx.lineTo(guard.x, guard.y);
+  ctx.fill();
+  // Cap brim: a hard dark wedge jutting past the body's facing edge — the
+  // peaked cap that says "guard" at thumbnail size.
+  ctx.fillStyle = '#141f38';
+  ctx.beginPath();
+  ctx.moveTo(guard.x, guard.y);
+  ctx.arc(guard.x, guard.y, GUARD.radius + 4.5, guard.facing - 0.52, guard.facing + 0.52);
+  ctx.closePath();
   ctx.fill();
   circle(ctx, guard.x + Math.cos(guard.facing) * 5, guard.y + Math.sin(guard.facing) * 5, 3, '#f5c542');
   if (guard.seesThief) {
@@ -285,11 +303,28 @@ function drawThief(ctx, state) {
   const sack = 6 + Math.min(8, state.lootCount * 1.4);
   circle(ctx, t.x - Math.cos(t.facing) * 13, t.y - Math.sin(t.facing) * 13 + bob, sack, '#8a6a3b');
   circle(ctx, t.x, t.y + bob, 13, '#20242f');
+  // Hood rim: a thick slate band around the back of the head, so the
+  // silhouette reads hooded thief rather than plain black circle.
+  ctx.strokeStyle = '#39415a';
+  ctx.lineWidth = 5;
+  ctx.beginPath();
+  ctx.arc(t.x, t.y + bob, 14.5, t.facing + Math.PI - 1.25, t.facing + Math.PI + 1.25);
+  ctx.stroke();
   ctx.fillStyle = '#11141d';
   ctx.beginPath();
   ctx.arc(t.x, t.y + bob, 13, t.facing - 1.2, t.facing + 1.2);
   ctx.lineTo(t.x, t.y + bob);
   ctx.fill();
+  // Cap peak jutting toward facing, past the gold ring.
+  const fxv = Math.cos(t.facing);
+  const fyv = Math.sin(t.facing);
+  const bx = t.x + fxv * 11;
+  const by = t.y + bob + fyv * 11;
+  polygon(ctx, [
+    { x: bx - fyv * 5.5, y: by + fxv * 5.5 },
+    { x: bx + fyv * 5.5, y: by - fxv * 5.5 },
+    { x: t.x + fxv * 21, y: t.y + bob + fyv * 21 },
+  ], '#0b0e16');
   // The mask stripe, facing the way he moves.
   ctx.strokeStyle = '#e8e6df';
   ctx.lineWidth = 3.4;
@@ -397,10 +432,39 @@ function drawOverlay(ctx, state) {
   }
 }
 
+/**
+ * The danger vignette: red closing in at the frame edges. It pulses while
+ * the alarm is hot, sits steady while the thief is spotted, and spikes for
+ * a moment on the discovery flash. Purely cosmetic — it reads state.fx and
+ * state.alarm, never feeds back into them.
+ */
+function drawVignette(ctx, state) {
+  if (state.screen !== 'play') return;
+  let alpha = 0;
+  if (state.alarm > 55) {
+    alpha += ((state.alarm - 55) / 45) * 0.17 * (0.78 + 0.22 * Math.sin(state.elapsed * 5));
+  }
+  if (state.spotted) alpha += 0.10;
+  if (state.fx) alpha += state.fx.flash * 0.30;
+  if (alpha <= 0.01) return;
+  const g = ctx.createRadialGradient(640, 428, 300, 640, 428, 760);
+  g.addColorStop(0, 'rgba(239, 68, 68, 0)');
+  g.addColorStop(1, `rgba(239, 68, 68, ${alpha.toFixed(3)})`);
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+}
+
 /** Draw the whole frame for the given state. */
 export function render(ctx, state, objective) {
   ctx.fillStyle = COLOURS.ink;
   ctx.fillRect(0, 0, VIEW.width, VIEW.height);
+  const fx = state.fx;
+  // Screen shake offsets the world only; the HUD stays put so the numbers
+  // never judder. In a frozen ?shot= frame the shake is always 0.
+  ctx.save();
+  if (fx && fx.shake > 0.2) {
+    ctx.translate(Math.sin(state.elapsed * 131) * fx.shake, Math.cos(state.elapsed * 149) * fx.shake);
+  }
   drawFloor(ctx, state);
   for (const w of state.walls) if (w.kind !== 'vault') drawFurniture(ctx, w);
   drawVaultDoor(ctx, state);
@@ -415,7 +479,11 @@ export function render(ctx, state, objective) {
   for (const guard of state.guards) drawGuard(ctx, state, guard);
   drawThief(ctx, state);
   drawCrackDial(ctx, state);
-  drawHud(ctx, state, objective);
+  if (fx) drawParticles(ctx, fx, false);
   drawMessage(ctx, state);
+  ctx.restore();
+  drawVignette(ctx, state);
+  drawHud(ctx, state, objective);
   drawOverlay(ctx, state);
+  if (fx) drawParticles(ctx, fx, true);
 }
