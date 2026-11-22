@@ -64,16 +64,18 @@ export function stageShot(state, name) {
     aim(state, 'lobby', 2.5); aim(state, 'gallery', 1.3); aim(state, 'vault', 1.1);
     take(state, ['cash-a', 'cash-b', 'painting', 'gem', 'crown', 'vase', 'necklace', 'bars', 'vault-haul']);
   } else {
-    // hero: the thief crosses the gallery with a guard's cone on him, the
-    // gallery camera sweeping, loot glowing and the alarm already at 34%.
+    // hero: a near-miss frozen mid-heartbeat — the thief caught at the very
+    // edge of the gallery guard's cone, the "!" up, the gallery camera
+    // sweeping, loot glowing and the alarm already at 78% with the red
+    // vignette closing in.
     state.elapsed = 47.0;
-    state.thief.x = 585; state.thief.y = 430; state.thief.facing = 0;
+    state.thief.x = 588; state.thief.y = 484; state.thief.facing = -2.6;
     state.thief.moving = true; state.thief.walkPhase = 1.2;
     place(state, 'lobby', 300, 470, -Math.PI / 2);
     place(state, 'gallery', 725, 425, Math.PI);
     place(state, 'vault', 1050, 430, Math.PI / 2);
     aim(state, 'lobby', 2.4); aim(state, 'gallery', 1.75); aim(state, 'vault', 1.2);
-    state.alarm = 34;
+    state.alarm = 78;
     state.spotted = true;
     state.guards.find((g) => g.id === 'gallery').seesThief = true;
     take(state, ['cash-a']);
