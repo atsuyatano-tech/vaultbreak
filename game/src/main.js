@@ -7,6 +7,8 @@ import { createState } from './world.js';
 import { objectiveText, stepGame } from './game.js';
 import { render } from './render.js';
 import { stageShot } from './stage.js';
+import { stepFx } from './fx.js';
+import { playSound, unlockAudio } from './audio.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -22,6 +24,7 @@ if (frozen) stageShot(state, shotName);
 
 const keys = new Set();
 addEventListener('keydown', (event) => {
+  unlockAudio();
   if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' '].includes(event.key)) event.preventDefault();
   keys.add(event.key.toLowerCase());
   if (state.screen === 'title' && (event.key === 'Enter' || event.key === ' ')) state.screen = 'play';
@@ -32,6 +35,7 @@ addEventListener('keydown', (event) => {
 });
 addEventListener('keyup', (event) => keys.delete(event.key.toLowerCase()));
 canvas.addEventListener('pointerdown', () => {
+  unlockAudio();
   if (state.screen === 'title') state.screen = 'play';
 });
 
@@ -59,6 +63,7 @@ function frame(now) {
   previous = now;
   if (!frozen) {
     stepGame(state, dt, currentInput());
+    for (const name of stepFx(state, dt)) playSound(name);
     announce();
   }
   render(ctx, state, objectiveText(state));
