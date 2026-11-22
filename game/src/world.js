@@ -4,6 +4,7 @@
 // segments, for blocking sight. All names and art are original to this game.
 
 import { VIEW } from './config.js';
+import { createFx } from './fx.js';
 
 const box = (x, y, w, h, kind) => ({ x, y, w, h, kind });
 
@@ -145,5 +146,6 @@ export function createState() {
     needle: 0,
     message: '',
     messageFor: 0,
+    fx: createFx(), // particles/shake/flash — presentation only, the rules never read it
   };
 }
