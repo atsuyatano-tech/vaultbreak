@@ -43,7 +43,7 @@ export const LASER = {
 
 export const VAULT_CRACK = {
   zoneRate: 46, // progress per second while the needle is in the sweet zone
-  offRate: 13, // progress per second while it is outside
+  offRate: 6, // progress per second while it is outside — low enough that missing the zone really costs time
   needleSpeed: 1.9, // dial sweeps per second (ping-pong)
   sweetHalf: 0.34, // half-width of the sweet zone, radians on the dial
 };
